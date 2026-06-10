@@ -3,6 +3,11 @@ export const metadata = {
   description: "GeoSports friend-group season leaderboard",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en">

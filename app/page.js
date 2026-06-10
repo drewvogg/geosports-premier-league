@@ -62,27 +62,73 @@ function fmtDate(iso) {
 
 const medals = { 1: "\u{1F947}", 2: "\u{1F948}", 3: "\u{1F949}" };
 
-function PlayerRow({ player, league, onSelect }) {
+function useIsMobile(breakpoint = 640) {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${breakpoint}px)`);
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, [breakpoint]);
+  return isMobile;
+}
+
+function PlayerRow({ player, league, onSelect, isMobile }) {
   const accent = league === "premier" ? "#FFD700" : "#4AE68A";
   const cardBg = league === "premier" ? "#111D35" : "#162119";
   const border = league === "premier" ? "rgba(255,215,0,0.1)" : "rgba(74,230,138,0.1)";
   const avBg = league === "premier" ? "rgba(255,215,0,0.15)" : "rgba(74,230,138,0.12)";
   const avBorder = league === "premier" ? "rgba(255,215,0,0.35)" : "rgba(74,230,138,0.3)";
   const rankColor = player.rank === 1 ? "#FFD700" : player.rank === 2 ? "#C0C0C0" : player.rank === 3 ? "#CD7F32" : "#556677";
+
+  const open = () => onSelect(player);
+  const onKey = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
+  const hoverIn = (e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 6px 25px ${border}`; };
+  const hoverOut = (e) => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "none"; };
+
+  if (isMobile) {
+    const ministat = (label, value, color) => (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.1rem" }}>
+        <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: "0.95rem", color: color || "#C8D2DC" }}>{value}</span>
+        <span style={{ fontSize: "0.55rem", color: "#556677", textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: 600 }}>{label}</span>
+      </div>
+    );
+    return (
+      <div
+        role="button" tabIndex={0} onClick={open} onKeyDown={onKey}
+        onTouchStart={() => {}} onMouseEnter={hoverIn} onMouseLeave={hoverOut}
+        style={{ padding: "0.85rem 0.95rem", borderRadius: 14, marginBottom: "0.5rem", background: cardBg, border: `1px solid ${border}`, transition: "transform 0.2s, box-shadow 0.2s", cursor: "pointer" }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "0.7rem" }}>
+          <div style={{ minWidth: 28, textAlign: "center", fontSize: medals[player.rank] ? "1.5rem" : "1.2rem", fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: rankColor }}>{medals[player.rank] || player.rank}</div>
+          <div style={{ width: 38, height: 38, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: avBg, border: `2px solid ${avBorder}`, color: accent, fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: "1rem", flexShrink: 0 }}>{player.name[0]}</div>
+          <span style={{ flex: 1, fontFamily: "'Oswald',sans-serif", fontSize: "1.25rem", fontWeight: 600, letterSpacing: "0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{player.name}</span>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: "1.5rem", color: accent, lineHeight: 1 }}>{player.avg.toFixed(1)}</div>
+            <div style={{ fontSize: "0.55rem", color: "#556677", textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: 600, marginTop: "0.15rem" }}>Avg</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-around", marginTop: "0.7rem", paddingTop: "0.7rem", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+          {ministat("Games", player.games)}
+          {ministat("Best", player.best, "#5BE8A0")}
+          {ministat("Worst", player.worst, "#FF4D6A")}
+          {ministat("Total", player.total.toLocaleString())}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onClick={() => onSelect(player)}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(player); } }}
-      style={{ display: "grid", gridTemplateColumns: "46px 1fr 55px 70px 60px 60px 70px", gap: "0.3rem", alignItems: "center", padding: "0.8rem 1rem", borderRadius: "12px", marginBottom: "0.35rem", background: cardBg, border: `1px solid ${border}`, transition: "transform 0.2s, box-shadow 0.2s", cursor: "pointer" }}
-      onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 6px 25px ${border}`; }}
-      onMouseLeave={(e) => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "none"; }}
+      role="button" tabIndex={0} onClick={open} onKeyDown={onKey}
+      onMouseEnter={hoverIn} onMouseLeave={hoverOut}
+      style={{ display: "grid", gridTemplateColumns: "44px 1fr 50px 64px 56px 56px 64px", gap: "0.3rem", alignItems: "center", padding: "0.8rem 1rem", borderRadius: "12px", marginBottom: "0.35rem", background: cardBg, border: `1px solid ${border}`, transition: "transform 0.2s, box-shadow 0.2s", cursor: "pointer" }}
     >
       <div style={{ textAlign: "center", fontSize: medals[player.rank] ? "1.4rem" : "1.3rem", fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: rankColor }}>{medals[player.rank] || player.rank}</div>
-      <div style={{ display: "flex", alignItems: "center", gap: "0.7rem" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.7rem", minWidth: 0 }}>
         <div style={{ width: 36, height: 36, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: avBg, border: `2px solid ${avBorder}`, color: accent, fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: "0.95rem", flexShrink: 0 }}>{player.name[0]}</div>
-        <span style={{ fontFamily: "'Oswald',sans-serif", fontSize: "1.1rem", fontWeight: 600, letterSpacing: "0.03em" }}>{player.name}</span>
+        <span style={{ fontFamily: "'Oswald',sans-serif", fontSize: "1.1rem", fontWeight: 600, letterSpacing: "0.03em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{player.name}</span>
       </div>
       <div style={{ textAlign: "center", fontSize: "0.9rem", color: "#8899AA" }}>{player.games}</div>
       <div style={{ textAlign: "center", fontSize: "1.1rem", fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: accent }}>{player.avg.toFixed(1)}</div>
@@ -93,20 +139,22 @@ function PlayerRow({ player, league, onSelect }) {
   );
 }
 
-function LeagueSection({ title, badge, badgeGrad, desc, players, league, accentColor, onSelect }) {
+function LeagueSection({ title, badge, badgeGrad, desc, players, league, accentColor, onSelect, isMobile }) {
   return (
     <div style={{ marginBottom: "2.5rem" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "0.8rem", paddingBottom: "0.6rem", borderBottom: `2px solid ${accentColor}`, marginBottom: "0.8rem" }}>
-        <div style={{ width: 42, height: 42, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", background: badgeGrad, color: league === "premier" ? "#1A1000" : "#0A1A10", fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: "1.1rem", boxShadow: `0 0 18px ${accentColor}44` }}>{badge}</div>
-        <div style={{ flex: 1 }}>
+        <div style={{ width: 42, height: 42, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", background: badgeGrad, color: league === "premier" ? "#1A1000" : "#0A1A10", fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: "1.1rem", boxShadow: `0 0 18px ${accentColor}44`, flexShrink: 0 }}>{badge}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: "1.5rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: accentColor }}>{title}</div>
           <div style={{ fontSize: "0.8rem", color: "#556677", fontWeight: 300, letterSpacing: "0.04em" }}>{desc}</div>
         </div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "46px 1fr 55px 70px 60px 60px 70px", gap: "0.3rem", padding: "0 1rem 0.4rem", fontSize: "0.65rem", fontWeight: 600, color: "#556677", textTransform: "uppercase", letterSpacing: "0.15em" }}>
-        <span>#</span><span>Player</span><span style={{ textAlign: "center" }}>Games</span><span style={{ textAlign: "center" }}>Avg</span><span style={{ textAlign: "center" }}>Best</span><span style={{ textAlign: "center" }}>Worst</span><span style={{ textAlign: "center" }}>Total</span>
-      </div>
-      {players.map((p) => <PlayerRow key={p.name} player={p} league={league} onSelect={onSelect} />)}
+      {!isMobile && (
+        <div style={{ display: "grid", gridTemplateColumns: "44px 1fr 50px 64px 56px 56px 64px", gap: "0.3rem", padding: "0 1rem 0.4rem", fontSize: "0.65rem", fontWeight: 600, color: "#556677", textTransform: "uppercase", letterSpacing: "0.15em" }}>
+          <span>#</span><span>Player</span><span style={{ textAlign: "center" }}>Games</span><span style={{ textAlign: "center" }}>Avg</span><span style={{ textAlign: "center" }}>Best</span><span style={{ textAlign: "center" }}>Worst</span><span style={{ textAlign: "center" }}>Total</span>
+        </div>
+      )}
+      {players.map((p) => <PlayerRow key={p.name} player={p} league={league} onSelect={onSelect} isMobile={isMobile} />)}
     </div>
   );
 }
@@ -481,6 +529,7 @@ export default function GeoSportsLeaderboard() {
   const [error, setError] = useState("");
   const [viewSeasonId, setViewSeasonId] = useState(null);
   const [selected, setSelected] = useState(null); // { player, league }
+  const isMobile = useIsMobile();
 
   const loadData = useCallback(async () => {
     try {
@@ -556,12 +605,12 @@ export default function GeoSportsLeaderboard() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "radial-gradient(ellipse 80% 50% at 20% 20%, rgba(255,215,0,0.03) 0%, transparent 70%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(74,230,138,0.02) 0%, transparent 70%), #060D18", color: "#F0F0F0", fontFamily: "'Barlow Condensed', sans-serif", padding: "2rem 1.5rem 3rem" }}>
+    <div style={{ minHeight: "100vh", background: "radial-gradient(ellipse 80% 50% at 20% 20%, rgba(255,215,0,0.03) 0%, transparent 70%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(74,230,138,0.02) 0%, transparent 70%), #060D18", color: "#F0F0F0", fontFamily: "'Barlow Condensed', sans-serif", padding: isMobile ? "1.5rem 0.9rem 3rem" : "2rem 1.5rem 3rem" }}>
       <div style={{ maxWidth: 920, margin: "0 auto" }}>
         <div style={{ textAlign: "center", marginBottom: "1.6rem" }}>
           <div style={{ fontSize: "2.8rem", marginBottom: "0.2rem", filter: "drop-shadow(0 0 20px rgba(255,215,0,0.4))" }}>🌍</div>
-          <h1 style={{ fontFamily: "'Oswald',sans-serif", fontSize: "3rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", background: "linear-gradient(135deg, #FFD700, #FFA500, #FFD700)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", margin: 0 }}>GeoSports</h1>
-          <p style={{ fontSize: "1rem", fontWeight: 300, color: "#8899AA", letterSpacing: "0.25em", textTransform: "uppercase", marginTop: "0.2rem" }}>{season.name} — {rounds.length} Round{rounds.length === 1 ? "" : "s"}{isLiveSeason ? "" : " (Archived)"}</p>
+          <h1 style={{ fontFamily: "'Oswald',sans-serif", fontSize: isMobile ? "2.4rem" : "3rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: isMobile ? "0.1em" : "0.15em", background: "linear-gradient(135deg, #FFD700, #FFA500, #FFD700)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", margin: 0 }}>GeoSports</h1>
+          <p style={{ fontSize: isMobile ? "0.85rem" : "1rem", fontWeight: 300, color: "#8899AA", letterSpacing: "0.2em", textTransform: "uppercase", marginTop: "0.2rem" }}>{season.name} — {rounds.length} Round{rounds.length === 1 ? "" : "s"}{isLiveSeason ? "" : " (Archived)"}</p>
         </div>
         {data.seasons.length > 1 && <SeasonBar seasons={data.seasons} activeId={data.activeSeason} viewId={viewId} onView={setViewSeasonId} />}
         {rounds.length === 0 && (
@@ -569,8 +618,8 @@ export default function GeoSportsLeaderboard() {
             Fresh season — no rounds yet. {admin ? "Add the first round below." : "Check back after the first round!"}
           </div>
         )}
-        {premier.length > 0 && <LeagueSection title="Premier League" badge="P" badgeGrad="linear-gradient(135deg, #FFD700, #FFA500)" desc={`Top tier — Average score ${PREMIER_CUTOFF}+`} players={premier} league="premier" accentColor="#FFD700" onSelect={(p) => setSelected({ player: p, league: "premier" })} />}
-        {champ.length > 0 && rounds.length > 0 && <LeagueSection title="Championship League" badge="C" badgeGrad="linear-gradient(135deg, #4AE68A, #2DBD6E)" desc="Grinding for promotion" players={champ} league="champ" accentColor="#4AE68A" onSelect={(p) => setSelected({ player: p, league: "champ" })} />}
+        {premier.length > 0 && <LeagueSection title="Premier League" badge="P" badgeGrad="linear-gradient(135deg, #FFD700, #FFA500)" desc={`Top tier — Average score ${PREMIER_CUTOFF}+`} players={premier} league="premier" accentColor="#FFD700" onSelect={(p) => setSelected({ player: p, league: "premier" })} isMobile={isMobile} />}
+        {champ.length > 0 && rounds.length > 0 && <LeagueSection title="Championship League" badge="C" badgeGrad="linear-gradient(135deg, #4AE68A, #2DBD6E)" desc="Grinding for promotion" players={champ} league="champ" accentColor="#4AE68A" onSelect={(p) => setSelected({ player: p, league: "champ" })} isMobile={isMobile} />}
         {selected && <PlayerProfileModal player={selected.player} league={selected.league} rounds={rounds} seasonName={season.name} onClose={() => setSelected(null)} />}
         {admin && isLiveSeason && <AddScoresPanel season={season} onSaveSeason={saveSeason} />}
         {admin && !isLiveSeason && <div style={{ textAlign: "center", marginTop: "1.5rem", fontSize: "0.85rem", color: "#556677" }}>Viewing an archived season — you can still edit its past rounds below, but new rounds go to the live season.</div>}
