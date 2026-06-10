@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getRedis, DATA_KEY, INITIAL_DATA, isValidData } from "@/lib/db";
+import { getRedis, DATA_KEY, INITIAL_DATA, isValidData, migrateData } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -8,11 +8,21 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const redis = getRedis();
-    let data = await redis.get(DATA_KEY);
-    if (!data) {
+    let raw = await redis.get(DATA_KEY);
+    let data;
+    if (!raw) {
       // First boot: seed with the original season data.
       data = INITIAL_DATA;
       await redis.set(DATA_KEY, data);
+    } else {
+      data = migrateData(raw);
+      if (!data) {
+        return NextResponse.json({ error: "Stored data is unreadable" }, { status: 500 });
+      }
+      if (data !== raw) {
+        // Old single-season format found: persist the migrated shape.
+        await redis.set(DATA_KEY, data);
+      }
     }
     return NextResponse.json({ data, admin: isAdmin() });
   } catch (err) {
