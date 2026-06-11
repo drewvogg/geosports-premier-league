@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getRedis, DATA_KEY, INITIAL_DATA, isValidData, migrateData } from "@/lib/db";
+import { getRedis, DATA_KEY, INITIAL_DATA, validateData, migrateData } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +20,8 @@ export async function GET() {
         return NextResponse.json({ error: "Stored data is unreadable" }, { status: 500 });
       }
       if (data !== raw) {
-        // Old single-season format found: persist the migrated shape.
+        // Older format found (missing seasons wrapper or round dates):
+        // persist the migrated shape. Scores are never modified.
         await redis.set(DATA_KEY, data);
       }
     }
@@ -37,8 +38,9 @@ export async function PUT(request) {
   }
   try {
     const body = await request.json();
-    if (!isValidData(body)) {
-      return NextResponse.json({ error: "Invalid data shape" }, { status: 400 });
+    const problem = validateData(body);
+    if (problem) {
+      return NextResponse.json({ error: problem }, { status: 400 });
     }
     const redis = getRedis();
     await redis.set(DATA_KEY, body);

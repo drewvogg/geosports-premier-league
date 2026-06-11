@@ -11,6 +11,12 @@ Built with Next.js, deployed free on Vercel, with scores stored in Upstash Redis
 - `app/api/login` / `logout` — checks `ADMIN_PASSWORD` and sets/clears an httpOnly session cookie (valid 30 days; rotating the password invalidates all sessions).
 - `lib/db.js` — Upstash Redis client; all data lives under one key, `geosports:data`. On first load it seeds the original season data automatically, and it transparently migrates old single-season data into the multi-season format (your scores become "Season 1").
 
+### Business rules
+
+- **One round per day** (per season), enforced in the UI and the server-side validator. "Add Scores" on a date that already has a round fills in missing scores only; existing scores are locked there and changeable via Edit Past Rounds.
+- **Every round has a date.** Season 1's original nine rounds are auto-assigned May 1–9, 2026 by a one-time server-side migration on first load after deploy (scores untouched).
+- **Archived seasons are locked.** Only the live season can be edited; history is final.
+
 ### Seasons & dates
 
 The data model supports multiple seasons. Viewers can switch between seasons with the pill bar (the live one has a green dot); archived seasons stay browsable forever. The commissioner gets a **Start New Season** button that archives the current board and starts a fresh one with the same roster, and each new round is saved with a date (the Add Scores form defaults to today). Rounds from before date-tracking existed simply show no date.

@@ -267,34 +267,26 @@ function PlayerProfileModal({ player, league, rounds, seasonName, onClose }) {
 
 function AddScoresPanel({ season, onSaveSeason }) {
   const [open, setOpen] = useState(false);
-  const [roundName, setRoundName] = useState("");
   const [roundDate, setRoundDate] = useState(todayISO());
   const [scores, setScores] = useState({});
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
 
   useEffect(() => {
-    setRoundName(`R${season.rounds.length + 1}`);
     setRoundDate(todayISO());
     const init = {};
     Object.keys(season.players).forEach((n) => (init[n] = ""));
     setScores(init);
   }, [season, open]);
 
-  const handleSave = async () => {
-    setSaving(true);
-    const ns = JSON.parse(JSON.stringify(season));
-    ns.rounds.push({ name: roundName || `R${ns.rounds.length + 1}`, date: roundDate || null });
-    Object.keys(ns.players).forEach((name) => {
-      const v = scores[name];
-      const num = v && v.trim() !== "" ? parseInt(v, 10) : null;
-      ns.players[name].push(isNaN(num) ? null : num);
-    });
-    const ok = await onSaveSeason(sortSeason(ns));
-    setSaving(false);
-    setMsg(ok ? "\u2705 Scores saved!" : "\u26A0\uFE0F Save failed — are you still logged in?");
-    setTimeout(() => { setMsg(""); if (ok) setOpen(false); }, 1500);
-  };
+  // One round per day: if the chosen date already has a round, we fill its
+  // blanks instead of creating a second round for that day.
+  const existingIdx = season.rounds.findIndex((r) => r.date === roundDate);
+  const existingRound = existingIdx >= 0 ? season.rounds[existingIdx] : null;
+  const newRoundName = `R${season.rounds.length + 1}`;
+  const blanksRemaining = existingRound
+    ? Object.keys(season.players).filter((n) => season.players[n][existingIdx] === null || season.players[n][existingIdx] === undefined)
+    : Object.keys(season.players);
 
   const handleAddPlayer = () => {
     const name = prompt("Enter new player name:");
@@ -309,26 +301,72 @@ function AddScoresPanel({ season, onSaveSeason }) {
   if (!open) {
     return (
       <div style={{ display: "flex", gap: "0.6rem", justifyContent: "center", marginTop: "1.5rem", flexWrap: "wrap" }}>
-        <button onClick={() => setOpen(true)} style={{ background: "linear-gradient(135deg, #FFD700, #FFA500)", color: "#1A1000", border: "none", padding: "0.7rem 1.8rem", borderRadius: 10, fontFamily: "'Oswald',sans-serif", fontSize: "1rem", fontWeight: 700, cursor: "pointer", letterSpacing: "0.08em", textTransform: "uppercase", boxShadow: "0 0 20px rgba(255,215,0,0.25)", transition: "transform 0.15s" }} onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.04)")} onMouseLeave={(e) => (e.currentTarget.style.transform = "none")}>+ Add Round Scores</button>
+        <button onClick={() => setOpen(true)} style={{ background: "linear-gradient(135deg, #FFD700, #FFA500)", color: "#1A1000", border: "none", padding: "0.7rem 1.8rem", borderRadius: 10, fontFamily: "'Oswald',sans-serif", fontSize: "1rem", fontWeight: 700, cursor: "pointer", letterSpacing: "0.08em", textTransform: "uppercase", boxShadow: "0 0 20px rgba(255,215,0,0.25)", transition: "transform 0.15s" }} onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.04)")} onMouseLeave={(e) => (e.currentTarget.style.transform = "none")}>+ Add Scores</button>
         <button onClick={handleAddPlayer} style={{ background: "transparent", color: "#4AE68A", border: "1px solid rgba(74,230,138,0.3)", padding: "0.7rem 1.5rem", borderRadius: 10, fontFamily: "'Oswald',sans-serif", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase", transition: "background 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(74,230,138,0.08)")} onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>+ Add Player</button>
       </div>
     );
   }
+
+  const handleSave = async () => {
+    if (!roundDate) { setMsg("\u26A0\uFE0F Pick a date first"); setTimeout(() => setMsg(""), 1500); return; }
+    setSaving(true);
+    const ns = JSON.parse(JSON.stringify(season));
+    const ei = ns.rounds.findIndex((r) => r.date === roundDate);
+    const parse = (v) => {
+      const num = v && v.trim() !== "" ? parseInt(v, 10) : null;
+      return isNaN(num) ? null : num;
+    };
+    if (ei >= 0) {
+      // Fill blanks only — existing scores for this day are never touched here.
+      Object.keys(ns.players).forEach((name) => {
+        const cur = ns.players[name][ei];
+        if (cur === null || cur === undefined) ns.players[name][ei] = parse(scores[name]);
+      });
+    } else {
+      ns.rounds.push({ name: newRoundName, date: roundDate });
+      Object.keys(ns.players).forEach((name) => ns.players[name].push(parse(scores[name])));
+    }
+    const ok = await onSaveSeason(sortSeason(ns));
+    setSaving(false);
+    setMsg(ok ? "\u2705 Scores saved!" : "\u26A0\uFE0F Save failed — are you still logged in?");
+    setTimeout(() => { setMsg(""); if (ok) setOpen(false); }, 1500);
+  };
+
   return (
     <div style={{ background: "#111D35", border: "1px solid rgba(255,215,0,0.15)", borderRadius: 14, padding: "1.5rem", marginTop: "1.5rem", maxWidth: 500, margin: "1.5rem auto 0" }}>
-      <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: "1.2rem", fontWeight: 700, color: "#FFD700", marginBottom: "1rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>Add Scores — {roundName}</div>
-      <div style={{ display: "flex", alignItems: "center", gap: "0.8rem", marginBottom: "0.9rem" }}>
+      <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: "1.2rem", fontWeight: 700, color: "#FFD700", marginBottom: "0.4rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+        {existingRound ? `Add Scores — ${existingRound.name} · ${fmtDate(roundDate)}` : `Add Scores — ${newRoundName}`}
+      </div>
+      {existingRound && (
+        <div style={{ fontSize: "0.8rem", color: "#8899AA", marginBottom: "0.8rem", lineHeight: 1.4 }}>
+          A round already exists for this date, so you&apos;re filling in its missing scores. Existing scores are locked — use Edit Past Rounds to change them.
+        </div>
+      )}
+      <div style={{ display: "flex", alignItems: "center", gap: "0.8rem", margin: "0.5rem 0 0.9rem" }}>
         <span style={{ width: 80, fontFamily: "'Oswald',sans-serif", fontWeight: 600, fontSize: "0.9rem", color: "#8899AA", textTransform: "uppercase", letterSpacing: "0.06em" }}>Date</span>
         <input type="date" value={roundDate} onChange={(e) => setRoundDate(e.target.value)} style={{ flex: 1, background: "#0A1628", border: "1px solid rgba(255,215,0,0.2)", borderRadius: 8, padding: "0.5rem 0.8rem", color: "#F0F0F0", fontFamily: "'Barlow Condensed',sans-serif", fontSize: "1rem", outline: "none", colorScheme: "dark" }} onFocus={(e) => (e.target.style.borderColor = "#FFD700")} onBlur={(e) => (e.target.style.borderColor = "rgba(255,215,0,0.2)")} />
       </div>
-      {Object.keys(season.players).sort().map((name) => (
-        <div key={name} style={{ display: "flex", alignItems: "center", gap: "0.8rem", marginBottom: "0.6rem" }}>
-          <span style={{ width: 80, fontFamily: "'Oswald',sans-serif", fontWeight: 600, fontSize: "1rem", color: "#F0F0F0" }}>{name}</span>
-          <input type="number" placeholder="—" value={scores[name] || ""} onChange={(e) => setScores((prev) => ({ ...prev, [name]: e.target.value }))} style={{ flex: 1, background: "#0A1628", border: "1px solid rgba(255,215,0,0.2)", borderRadius: 8, padding: "0.5rem 0.8rem", color: "#F0F0F0", fontFamily: "'Barlow Condensed',sans-serif", fontSize: "1rem", outline: "none" }} onFocus={(e) => (e.target.style.borderColor = "#FFD700")} onBlur={(e) => (e.target.style.borderColor = "rgba(255,215,0,0.2)")} />
-        </div>
-      ))}
+      {Object.keys(season.players).sort().map((name) => {
+        const locked = existingRound && !blanksRemaining.includes(name);
+        return (
+          <div key={name} style={{ display: "flex", alignItems: "center", gap: "0.8rem", marginBottom: "0.6rem" }}>
+            <span style={{ width: 80, fontFamily: "'Oswald',sans-serif", fontWeight: 600, fontSize: "1rem", color: locked ? "#556677" : "#F0F0F0" }}>{name}</span>
+            {locked ? (
+              <div style={{ flex: 1, padding: "0.5rem 0.8rem", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", color: "#8899AA", fontFamily: "'Barlow Condensed',sans-serif", fontSize: "1rem", display: "flex", justifyContent: "space-between" }}>
+                <span>{season.players[name][existingIdx]}</span>
+                <span style={{ fontSize: "0.7rem", letterSpacing: "0.1em", textTransform: "uppercase", color: "#556677", alignSelf: "center" }}>recorded</span>
+              </div>
+            ) : (
+              <input type="number" placeholder="—" value={scores[name] || ""} onChange={(e) => setScores((prev) => ({ ...prev, [name]: e.target.value }))} style={{ flex: 1, background: "#0A1628", border: "1px solid rgba(255,215,0,0.2)", borderRadius: 8, padding: "0.5rem 0.8rem", color: "#F0F0F0", fontFamily: "'Barlow Condensed',sans-serif", fontSize: "1rem", outline: "none" }} onFocus={(e) => (e.target.style.borderColor = "#FFD700")} onBlur={(e) => (e.target.style.borderColor = "rgba(255,215,0,0.2)")} />
+            )}
+          </div>
+        );
+      })}
+      {existingRound && blanksRemaining.length === 0 && (
+        <div style={{ textAlign: "center", fontSize: "0.85rem", color: "#FF4D6A", margin: "0.6rem 0" }}>Everyone already has a score for this date.</div>
+      )}
       <div style={{ display: "flex", gap: "0.6rem", marginTop: "1rem" }}>
-        <button onClick={handleSave} disabled={saving} style={{ flex: 1, background: "linear-gradient(135deg, #FFD700, #FFA500)", color: "#1A1000", border: "none", padding: "0.65rem", borderRadius: 8, fontFamily: "'Oswald',sans-serif", fontSize: "0.95rem", fontWeight: 700, cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.06em", opacity: saving ? 0.6 : 1 }}>{saving ? "Saving..." : "Save Scores"}</button>
+        <button onClick={handleSave} disabled={saving || !roundDate || (existingRound && blanksRemaining.length === 0)} style={{ flex: 1, background: "linear-gradient(135deg, #FFD700, #FFA500)", color: "#1A1000", border: "none", padding: "0.65rem", borderRadius: 8, fontFamily: "'Oswald',sans-serif", fontSize: "0.95rem", fontWeight: 700, cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.06em", opacity: saving || !roundDate || (existingRound && blanksRemaining.length === 0) ? 0.5 : 1 }}>{saving ? "Saving..." : "Save Scores"}</button>
         <button onClick={() => setOpen(false)} style={{ background: "transparent", color: "#8899AA", border: "1px solid #334455", padding: "0.65rem 1.2rem", borderRadius: 8, fontFamily: "'Oswald',sans-serif", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer", textTransform: "uppercase" }}>Cancel</button>
       </div>
       {msg && <div style={{ textAlign: "center", marginTop: "0.6rem", color: msg.startsWith("\u2705") ? "#4AE68A" : "#FF4D6A", fontWeight: 600 }}>{msg}</div>}
@@ -375,9 +413,20 @@ function EditRoundPanel({ season, onSaveSeason }) {
   }
 
   const handleSave = async () => {
+    if (!date) {
+      setMsg("\u26A0\uFE0F Every round needs a date");
+      setTimeout(() => setMsg(""), 2200);
+      return;
+    }
+    const clash = season.rounds.some((r, i) => i !== idx && r.date === date);
+    if (clash) {
+      setMsg(`\u26A0\uFE0F ${fmtDate(date)} already has a round — only one round per day`);
+      setTimeout(() => setMsg(""), 2800);
+      return;
+    }
     setSaving(true);
     let ns = JSON.parse(JSON.stringify(season));
-    ns.rounds[idx] = { name: name.trim() || ns.rounds[idx].name, date: date || null };
+    ns.rounds[idx] = { name: name.trim() || ns.rounds[idx].name, date };
     Object.keys(ns.players).forEach((n) => {
       const v = scores[n];
       const num = v && v.trim() !== "" ? parseInt(v, 10) : null;
@@ -408,7 +457,7 @@ function EditRoundPanel({ season, onSaveSeason }) {
         <span style={{ width: 80, fontFamily: "'Oswald',sans-serif", fontWeight: 600, fontSize: "0.9rem", color: "#8899AA", textTransform: "uppercase", letterSpacing: "0.06em" }}>Round</span>
         <select value={idx} onChange={(e) => loadRound(parseInt(e.target.value, 10), season)} style={{ flex: 1, background: "#0A1628", border: "1px solid rgba(136,153,170,0.25)", borderRadius: 8, padding: "0.5rem 0.8rem", color: "#F0F0F0", fontFamily: "'Barlow Condensed',sans-serif", fontSize: "1rem", outline: "none" }}>
           {season.rounds.map((r, i) => (
-            <option key={i} value={i}>{r.name}{r.date ? ` · ${fmtDate(r.date)}` : " · no date"}</option>
+            <option key={i} value={i}>{r.name} · {fmtDate(r.date)}</option>
           ))}
         </select>
       </div>
@@ -433,7 +482,7 @@ function EditRoundPanel({ season, onSaveSeason }) {
         <button onClick={handleDelete} style={{ background: "transparent", color: "#FF4D6A", border: "1px solid rgba(255,77,106,0.35)", padding: "0.65rem 1rem", borderRadius: 8, fontFamily: "'Oswald',sans-serif", fontSize: "0.85rem", fontWeight: 600, cursor: "pointer", textTransform: "uppercase" }}>Delete</button>
         <button onClick={() => setOpen(false)} style={{ background: "transparent", color: "#8899AA", border: "1px solid #334455", padding: "0.65rem 1.2rem", borderRadius: 8, fontFamily: "'Oswald',sans-serif", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer", textTransform: "uppercase" }}>Close</button>
       </div>
-      <div style={{ marginTop: "0.7rem", fontSize: "0.7rem", color: "#556677", textAlign: "center" }}>Blank score = DNP · changing the date re-sorts rounds chronologically</div>
+      <div style={{ marginTop: "0.7rem", fontSize: "0.7rem", color: "#556677", textAlign: "center" }}>Blank score = DNP · one round per day · date changes re-sort rounds</div>
       {msg && <div style={{ textAlign: "center", marginTop: "0.6rem", color: msg.startsWith("\u2705") ? "#4AE68A" : "#FF4D6A", fontWeight: 600 }}>{msg}</div>}
     </div>
   );
@@ -622,8 +671,8 @@ export default function GeoSportsLeaderboard() {
         {champ.length > 0 && rounds.length > 0 && <LeagueSection title="Championship League" badge="C" badgeGrad="linear-gradient(135deg, #4AE68A, #2DBD6E)" desc="Grinding for promotion" players={champ} league="champ" accentColor="#4AE68A" onSelect={(p) => setSelected({ player: p, league: "champ" })} isMobile={isMobile} />}
         {selected && <PlayerProfileModal player={selected.player} league={selected.league} rounds={rounds} seasonName={season.name} onClose={() => setSelected(null)} />}
         {admin && isLiveSeason && <AddScoresPanel season={season} onSaveSeason={saveSeason} />}
-        {admin && !isLiveSeason && <div style={{ textAlign: "center", marginTop: "1.5rem", fontSize: "0.85rem", color: "#556677" }}>Viewing an archived season — you can still edit its past rounds below, but new rounds go to the live season.</div>}
-        {admin && <EditRoundPanel season={season} onSaveSeason={saveSeason} />}
+        {admin && isLiveSeason && <EditRoundPanel season={season} onSaveSeason={saveSeason} />}
+        {admin && !isLiveSeason && <div style={{ textAlign: "center", marginTop: "1.5rem", fontSize: "0.85rem", color: "#556677" }}>🔒 Archived season — scores are locked and final.</div>}
         {admin && <CommissionerTools data={data} onSave={saveData} onReset={() => saveData(INITIAL, "season-1")} />}
         <AdminBar admin={admin} onLogin={handleLogin} onLogout={handleLogout} />
         <div style={{ textAlign: "center", marginTop: "1.5rem", fontSize: "0.72rem", color: "#556677", fontWeight: 300, letterSpacing: "0.1em" }}>{rounds.length} rounds played  ·  Ranked by average score  ·  Premier cutoff: {PREMIER_CUTOFF}+ avg</div>
